@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Your QR</title>
+</head>
+
+<body style="text-align:center; font-family:Arial;">
+
+<h2>Your Travel QR</h2>
+
+<img src="{{ url_for('static', filename='qr/' + trip_id + '.png') }}">
+
+<p>{{ trip_id }}</p>
+
+</body>
+</html>
