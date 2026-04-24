@@ -77,9 +77,19 @@ def qr(trip_id):
 # -------------------------------
 # QR PAGE
 # -------------------------------
-@app.route("/qr_page/<trip_id>")
-def qr_page(trip_id):
-    return render_template("qr.html", trip_id=trip_id)
+@app.route("/qr/<trip_id>")
+def qr(trip_id):
+    import qrcode
+    import io
+    from flask import Response
+
+    img = qrcode.make(trip_id)
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return Response(buffer.getvalue(), mimetype="image/png")
 
 # -------------------------------
 # LOGIN
