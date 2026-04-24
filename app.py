@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, Response
 from dotenv import load_dotenv
 import psycopg2
 import os
@@ -62,27 +62,10 @@ def register():
     return render_template("register.html")
 
 # -------------------------------
-# QR IMAGE (DYNAMIC)
+# QR IMAGE (WORKS ON RENDER)
 # -------------------------------
 @app.route("/qr/<trip_id>")
 def qr(trip_id):
-    img = qrcode.make(trip_id)
-
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    return send_file(buffer, mimetype="image/png")
-
-# -------------------------------
-# QR PAGE
-# -------------------------------
-@app.route("/qr/<trip_id>")
-def qr(trip_id):
-    import qrcode
-    import io
-    from flask import Response
-
     img = qrcode.make(trip_id)
 
     buffer = io.BytesIO()
@@ -90,6 +73,13 @@ def qr(trip_id):
     buffer.seek(0)
 
     return Response(buffer.getvalue(), mimetype="image/png")
+
+# -------------------------------
+# QR PAGE (DISPLAY)
+# -------------------------------
+@app.route("/qr_page/<trip_id>")
+def qr_page(trip_id):
+    return render_template("qr.html", trip_id=trip_id)
 
 # -------------------------------
 # LOGIN
