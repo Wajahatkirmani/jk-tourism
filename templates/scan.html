@@ -1,158 +1,40 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>JK Scanner</title>
-
-    <script src="https://unpkg.com/html5-qrcode"></script>
-
-    <!-- PWA -->
-    <link rel="manifest" href="/static/manifest.json">
-
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/sw.js');
-        }
-    </script>
-
-    <style>
-        body {
-            font-family: Arial;
-            text-align: center;
-            background: #f4f6f9;
-        }
-
-        .box {
-            background: white;
-            width: 350px;
-            margin: auto;
-            margin-top: 20px;
-            padding: 20px;
-            border-radius: 10px;
-        }
-
-        #reader {
-            margin-top: 10px;
-        }
-
-        button {
-            background: #0a3d62;
-            color: white;
-            padding: 10px;
-            border: none;
-            margin-top: 10px;
-            width: 100%;
-        }
-    </style>
-
-</head>
-
-<body>
-
-<div class="box">
-
-    <h3>{{ destination }} Scanner</h3>
-
-    {% if message %}
-        <p><b>{{ message }}</b></p>
-    {% endif %}
-
-    <div id="reader"></div>
-
-    <form method="POST" id="scanForm">
-        <input type="hidden" name="trip_id" id="trip_id">
-    </form>
-
-    <button id="installBtn" style="display:none;">Install Scanner App</button>
-
-</div>
+<script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
-let scanned = false;
+    let lastScanned = null;
 
-// -------------------
-// OFFLINE STORAGE
-// -------------------
-function saveOfflineScan(trip_id) {
-    let scans = JSON.parse(localStorage.getItem("offline_scans") || "[]");
+    function onScanSuccess(decodedText) {
 
-    scans.push({
-        trip_id: trip_id,
-        time: new Date().toISOString()
-    });
+        // Prevent duplicate scans
+        if (decodedText === lastScanned) return;
+        lastScanned = decodedText;
 
-    localStorage.setItem("offline_scans", JSON.stringify(scans));
-}
-
-// -------------------
-// SCAN SUCCESS
-// -------------------
-function onScanSuccess(decodedText) {
-
-    if(scanned) return;
-    scanned = true;
-
-    // OFFLINE MODE
-    if (!navigator.onLine) {
-        saveOfflineScan(decodedText);
-        alert("Saved offline. Will sync later.");
-        scanned = false;
-        return;
-    }
-
-    // ONLINE MODE
-    document.getElementById("trip_id").value = decodedText;
-    document.getElementById("scanForm").submit();
-}
-
-// -------------------
-// INIT SCANNER
-// -------------------
-let scanner = new Html5QrcodeScanner("reader", {
-    fps: 10,
-    qrbox: 250
-});
-
-scanner.render(onScanSuccess);
-
-// -------------------
-// INSTALL BUTTON
-// -------------------
-let deferredPrompt;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById('installBtn').style.display = 'block';
-});
-
-document.getElementById('installBtn').addEventListener('click', () => {
-    deferredPrompt.prompt();
-});
-
-// -------------------
-// AUTO SYNC
-// -------------------
-window.addEventListener("online", async () => {
-
-    let scans = JSON.parse(localStorage.getItem("offline_scans") || "[]");
-
-    for (let scan of scans) {
-        await fetch("/scan", {
+        // Send scan to backend WITHOUT reload
+        fetch("/scan", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                trip_id: scan.trip_id
-            })
+            body: JSON.stringify({ trip_id: decodedText })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Scan saved:", data);
+
+            // Optional: show message
+            document.getElementById("status").innerText = "✅ Scan saved";
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById("status").innerText = "❌ Error saving scan";
         });
     }
 
-    localStorage.removeItem("offline_scans");
+    let scanner = new Html5Qrcode("reader");
 
-    alert("Offline scans synced successfully!");
-});
+    scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onScanSuccess
+    );
 </script>
-
-</body>
-</html>
