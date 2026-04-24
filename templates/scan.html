@@ -1,15 +1,66 @@
-<script src="https://unpkg.com/html5-qrcode"></script>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scanner</title>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f4f6f9;
+        }
+
+        .box {
+            background: white;
+            width: 350px;
+            margin: auto;
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        #reader {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 10px;
+            background: #0a3d62;
+            color: white;
+            border: none;
+            width: 100%;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="box">
+
+    <h3>{{ destination }} Scanner</h3>
+
+    <div id="reader"></div>
+
+    <p id="status" style="color:green;"></p>
+
+    <a href="/logout"><button>Logout</button></a>
+
+</div>
 
 <script>
     let lastScanned = null;
 
     function onScanSuccess(decodedText) {
 
-        // Prevent duplicate scans
         if (decodedText === lastScanned) return;
         lastScanned = decodedText;
 
-        // Send scan to backend WITHOUT reload
+        document.getElementById("status").innerText = "Scanning...";
+
         fetch("/scan", {
             method: "POST",
             headers: {
@@ -19,14 +70,10 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log("Scan saved:", data);
-
-            // Optional: show message
             document.getElementById("status").innerText = "✅ Scan saved";
         })
         .catch(err => {
-            console.error(err);
-            document.getElementById("status").innerText = "❌ Error saving scan";
+            document.getElementById("status").innerText = "❌ Error";
         });
     }
 
@@ -36,5 +83,10 @@
         { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
         onScanSuccess
-    );
+    ).catch(err => {
+        document.getElementById("status").innerText = "Camera error: " + err;
+    });
 </script>
+
+</body>
+</html>
