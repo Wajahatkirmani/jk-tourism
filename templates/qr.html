@@ -8,9 +8,11 @@
 
 <h2>Your Travel QR</h2>
 
-<img src="{{ url_for('static', filename='qr/' + trip_id + '.png') }}">
+<p>Show this QR at tourist destinations</p>
 
-<p>{{ trip_id }}</p>
+<img src="/qr/{{ trip_id }}" width="250">
+
+<p><b>{{ trip_id }}</b></p>
 
 </body>
 </html>

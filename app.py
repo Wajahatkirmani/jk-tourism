@@ -1,12 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, send_file
 from dotenv import load_dotenv
 import psycopg2
 import os
 import qrcode
 import uuid
 from datetime import datetime
+import io
 
-# Load .env
 load_dotenv()
 
 app = Flask(__name__)
@@ -36,7 +36,6 @@ def register():
         entry_mode = request.form["entry_mode"]
         tourist_type = request.form["tourist_type"]
 
-        # MULTI-SELECT ORIGIN
         origin_list = request.form.getlist("origin")
         origin = ", ".join(origin_list)
 
@@ -58,26 +57,32 @@ def register():
         conn.commit()
         conn.close()
 
-        # QR GENERATION
-        if not os.path.exists("static/qr"):
-            os.makedirs("static/qr")
-
-        img = qrcode.make(trip_id)
-        img.save(f"static/qr/{trip_id}.png")
-
-        return redirect(url_for("qr", trip_id=trip_id))
+        return redirect(url_for("qr_page", trip_id=trip_id))
 
     return render_template("register.html")
 
 # -------------------------------
-# SHOW QR
+# QR IMAGE (DYNAMIC)
 # -------------------------------
 @app.route("/qr/<trip_id>")
 def qr(trip_id):
+    img = qrcode.make(trip_id)
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return send_file(buffer, mimetype="image/png")
+
+# -------------------------------
+# QR PAGE
+# -------------------------------
+@app.route("/qr_page/<trip_id>")
+def qr_page(trip_id):
     return render_template("qr.html", trip_id=trip_id)
 
 # -------------------------------
-# LOGIN (DESTINATION STAFF)
+# LOGIN
 # -------------------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -119,7 +124,6 @@ def scan():
 
     if request.method == "POST":
 
-        # SUPPORT BOTH FORM + OFFLINE JSON
         if request.is_json:
             data = request.get_json()
             trip_id = data.get("trip_id")
@@ -168,6 +172,7 @@ def scan():
         return render_template("scan.html", destination=destination, message="Scan successful")
 
     return render_template("scan.html", destination=destination)
+
 # -------------------------------
 # LOGOUT
 # -------------------------------
