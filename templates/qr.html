@@ -10,7 +10,7 @@
 
 <p>Show this QR at tourist destinations</p>
 
-<img src="/qr/{{ trip_id }}" width="250">
+<img src="{{ url_for('qr', trip_id=trip_id) }}" width="250">
 
 <p><b>{{ trip_id }}</b></p>
 
