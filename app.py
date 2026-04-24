@@ -62,17 +62,21 @@ def register():
     return render_template("register.html")
 
 # -------------------------------
-# QR IMAGE (WORKS ON RENDER)
+# QR IMAGE (FINAL SAFE VERSION)
 # -------------------------------
 @app.route("/qr/<trip_id>")
 def qr(trip_id):
-    img = qrcode.make(trip_id)
+    try:
+        img = qrcode.make(trip_id)
 
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
 
-    return Response(buffer.getvalue(), mimetype="image/png")
+        return Response(buffer.getvalue(), mimetype="image/png")
+
+    except Exception as e:
+        return f"QR Error: {str(e)}"
 
 # -------------------------------
 # QR PAGE (DISPLAY)

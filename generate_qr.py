@@ -3,6 +3,6 @@ import qrcode
 url = "https://jk-tourism.onrender.com/register"
 
 img = qrcode.make(url)
-img.save("entry_qr.png")
+img.save("ENTRY_QR.png")
 
 print("QR created successfully!")
