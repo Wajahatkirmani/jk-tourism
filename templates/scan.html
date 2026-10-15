@@ -1,38 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Scanner</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>JK Tourism Scanner</title>
 
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             text-align: center;
             background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
         }
 
         .box {
             background: white;
-            width: 350px;
-            margin: auto;
-            margin-top: 30px;
-            padding: 20px;
-            border-radius: 10px;
+            width: 100%;
+            max-width: 420px;
+            margin: 20px auto;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        h2 {
+            color: #0a3d62;
+            margin-top: 5px;
+        }
+
+        .destination {
+            color: #0a3d62;
+            font-weight: bold;
         }
 
         #reader {
             width: 100%;
-            margin-top: 10px;
+            margin: 18px auto;
+        }
+
+        #status {
+            padding: 13px;
+            margin-top: 15px;
+            border-radius: 7px;
+            font-size: 15px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+
+        .success {
+            color: #155724;
+            background: #d4edda;
+        }
+
+        .warning {
+            color: #856404;
+            background: #fff3cd;
+        }
+
+        .error {
+            color: #721c24;
+            background: #f8d7da;
+        }
+
+        .info {
+            color: #0c5460;
+            background: #d1ecf1;
         }
 
         button {
-            padding: 10px;
+            padding: 12px;
             background: #0a3d62;
             color: white;
             border: none;
+            border-radius: 7px;
             width: 100%;
-            margin-top: 10px;
+            margin-top: 12px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #075080;
+        }
+
+        .hint {
+            font-size: 13px;
+            color: #666;
         }
     </style>
 </head>
@@ -41,51 +102,200 @@
 
 <div class="box">
 
-    <h3>{{ destination }} Scanner</h3>
+    <h2>JK Tourism Scanner</h2>
+
+    <p>
+        Destination:
+        <span class="destination">{{ destination }}</span>
+    </p>
+
+    <p class="hint">
+        Scan the tourist's registration QR code below.
+    </p>
 
     <div id="reader"></div>
 
-    <p id="status" style="color:green;"></p>
+    <div id="status" class="info" role="status" aria-live="polite">
+        Initializing camera...
+    </div>
 
-    <a href="/logout"><button>Logout</button></a>
+    <button type="button" id="logoutButton" onclick="logout()">
+        Logout
+    </button>
 
 </div>
 
 <script>
+    let scanner = null;
+    let processing = false;
+
+    // Suppress repeated camera callbacks briefly.
     let lastScanned = null;
+    let lastScannedAt = 0;
 
-    function onScanSuccess(decodedText) {
+    const statusElement = document.getElementById("status");
 
-        if (decodedText === lastScanned) return;
-        lastScanned = decodedText;
-
-        document.getElementById("status").innerText = "Scanning...";
-
-        fetch("/scan", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ trip_id: decodedText })
-        })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById("status").innerText = "✅ Scan saved";
-        })
-        .catch(err => {
-            document.getElementById("status").innerText = "❌ Error";
-        });
+    function showStatus(message, type = "info") {
+        statusElement.textContent = message;
+        statusElement.className = type;
     }
 
-    let scanner = new Html5Qrcode("reader");
+    async function onScanSuccess(decodedText) {
+        const now = Date.now();
 
-    scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        onScanSuccess
-    ).catch(err => {
-        document.getElementById("status").innerText = "Camera error: " + err;
-    });
+        if (processing) {
+            return;
+        }
+
+        // Prevent the camera from submitting the same QR continuously
+        // while it remains in view. The backend still checks duplicates.
+        if (
+            decodedText === lastScanned &&
+            now - lastScannedAt < 2500
+        ) {
+            return;
+        }
+
+        lastScanned = decodedText;
+        lastScannedAt = now;
+        processing = true;
+
+        showStatus("Checking QR code...", "info");
+
+        try {
+            const response = await fetch("/scan", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                    trip_id: decodedText.trim()
+                })
+            });
+
+            const contentType =
+                response.headers.get("content-type") || "";
+
+            if (!contentType.includes("application/json")) {
+                if (response.redirected) {
+                    throw new Error(
+                        "Your session may have expired. Please log in again."
+                    );
+                }
+
+                throw new Error(
+                    "Unexpected server response. Please try again."
+                );
+            }
+
+            const data = await response.json();
+
+            if (response.status === 401 || response.status === 403) {
+                showStatus(
+                    data.message || "Session expired. Please log in again.",
+                    "error"
+                );
+                return;
+            }
+
+            switch ((data.status || "").toLowerCase()) {
+                case "success":
+                    showStatus(
+                        data.message || "✅ Scan successful!",
+                        "success"
+                    );
+                    break;
+
+                case "duplicate":
+                    showStatus(
+                        data.message ||
+                            "⚠️ QR already scanned at this destination.",
+                        "warning"
+                    );
+                    break;
+
+                case "invalid":
+                    showStatus(
+                        data.message ||
+                            "❌ Invalid QR code. Tourist not registered.",
+                        "error"
+                    );
+                    break;
+
+                case "unauthorized":
+                    showStatus(
+                        data.message ||
+                            "Session expired. Please log in again.",
+                        "error"
+                    );
+                    break;
+
+                default:
+                    showStatus(
+                        data.message ||
+                            "Unable to process this QR code.",
+                        "error"
+                    );
+            }
+
+        } catch (error) {
+            console.error("Scanner error:", error);
+
+            showStatus(
+                "❌ " + error.message,
+                "error"
+            );
+
+        } finally {
+            // Allow the next scan without stopping the camera.
+            setTimeout(() => {
+                processing = false;
+            }, 700);
+        }
+    }
+
+    async function startScanner() {
+        try {
+            scanner = new Html5Qrcode("reader");
+
+            await scanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: {
+                        width: 250,
+                        height: 250
+                    },
+                    aspectRatio: 1.0
+                },
+                onScanSuccess,
+                () => {
+                    // Ignore normal frames without a detected QR.
+                }
+            );
+
+            showStatus(
+                "📷 Camera ready. Scan a tourist QR code.",
+                "info"
+            );
+
+        } catch (error) {
+            console.error("Camera initialization error:", error);
+
+            showStatus(
+                "Camera could not start. Check camera permissions and HTTPS.",
+                "error"
+            );
+        }
+    }
+
+    function logout() {
+        window.location.href = "/logout";
+    }
+
+    startScanner();
 </script>
 
 </body>
